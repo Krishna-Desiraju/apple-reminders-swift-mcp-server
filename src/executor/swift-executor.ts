@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { MCPError, MCPErrorCode, mapSwiftErrorCode, SwiftCLIError } from '../types/error.js';
@@ -44,7 +44,9 @@ export class SwiftExecutor {
     const jsonInput = JSON.stringify(args);
 
     try {
-      const result = execSync(`"${this.cliPath}" ${command} '${jsonInput}'`, {
+      // Pass argv directly rather than building a shell string: reminder titles
+      // routinely contain apostrophes, which break shell quoting.
+      const result = execFileSync(this.cliPath, [command, jsonInput], {
         encoding: 'utf-8',
         timeout: this.timeout,
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -99,7 +101,7 @@ export class SwiftExecutor {
    */
   async requestAccess(): Promise<{ granted: boolean; message: string }> {
     try {
-      const result = execSync(`"${this.cliPath}" request-access`, {
+      const result = execFileSync(this.cliPath, ['request-access'], {
         encoding: 'utf-8',
         timeout: this.timeout,
         stdio: ['pipe', 'pipe', 'pipe'],
