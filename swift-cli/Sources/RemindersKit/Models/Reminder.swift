@@ -19,6 +19,17 @@ public struct Reminder: Codable {
     public let url: String?
     public let hasAlarms: Bool
     public let hasRecurrenceRules: Bool
+    /// The reminder's recurrence: its rule, the unsupported marker for a rule this server can't
+    /// express exactly, or nil when it doesn't repeat
+    public let recurrence: ReminderRecurrence?
+    /// False for a date-only due date
+    public let dueDateHasTime: Bool
+    
+    private enum CodingKeys: String, CodingKey {
+        case id, title, notes, isCompleted, priority, dueDate, completionDate, creationDate
+        case modificationDate, listId, listName, flagged, url, hasAlarms, hasRecurrenceRules
+        case recurrence, dueDateHasTime
+    }
     
     /// Initialize from EKReminder
     public init(from ekReminder: EKReminder) {
@@ -37,6 +48,8 @@ public struct Reminder: Codable {
         self.url = ekReminder.url?.absoluteString
         self.hasAlarms = ekReminder.hasAlarms
         self.hasRecurrenceRules = ekReminder.hasRecurrenceRules
+        self.recurrence = ReminderRecurrence.from(rules: ekReminder.recurrenceRules)
+        self.dueDateHasTime = ekReminder.dueDateComponents?.hour != nil
     }
     
     /// Manual initializer for testing
@@ -55,7 +68,9 @@ public struct Reminder: Codable {
         flagged: Bool = false,
         url: String? = nil,
         hasAlarms: Bool = false,
-        hasRecurrenceRules: Bool = false
+        hasRecurrenceRules: Bool = false,
+        recurrence: ReminderRecurrence? = nil,
+        dueDateHasTime: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -72,6 +87,31 @@ public struct Reminder: Codable {
         self.url = url
         self.hasAlarms = hasAlarms
         self.hasRecurrenceRules = hasRecurrenceRules
+        self.recurrence = recurrence
+        self.dueDateHasTime = dueDateHasTime
+    }
+    
+    /// Same as the synthesized encoding, except `recurrence` is written as null (not left out)
+    /// when the reminder doesn't repeat.
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encodeIfPresent(notes, forKey: .notes)
+        try container.encode(isCompleted, forKey: .isCompleted)
+        try container.encode(priority, forKey: .priority)
+        try container.encodeIfPresent(dueDate, forKey: .dueDate)
+        try container.encodeIfPresent(completionDate, forKey: .completionDate)
+        try container.encodeIfPresent(creationDate, forKey: .creationDate)
+        try container.encodeIfPresent(modificationDate, forKey: .modificationDate)
+        try container.encode(listId, forKey: .listId)
+        try container.encode(listName, forKey: .listName)
+        try container.encode(flagged, forKey: .flagged)
+        try container.encodeIfPresent(url, forKey: .url)
+        try container.encode(hasAlarms, forKey: .hasAlarms)
+        try container.encode(hasRecurrenceRules, forKey: .hasRecurrenceRules)
+        try container.encode(recurrence, forKey: .recurrence)
+        try container.encode(dueDateHasTime, forKey: .dueDateHasTime)
     }
 }
 

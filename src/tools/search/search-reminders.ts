@@ -1,5 +1,6 @@
 import { SwiftExecutor } from '../../executor/swift-executor.js';
 import { searchRemindersSchema, validateInput } from '../../validation/reminder-schemas.js';
+import { formatReminderList } from '../format-reminders.js';
 import type { Reminder } from '../../types/reminder.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
@@ -40,12 +41,11 @@ export async function searchRemindersHandler(
     };
   }
 
-  const remindersList = reminders
-    .map((r, index) => {
-      const status = r.isCompleted ? '✅' : '⏳';
-      return `${index + 1}. ${status} ${r.title}\n   ${r.notes || 'No notes'}`;
-    })
-    .join('\n\n');
+  const remindersList = formatReminderList(reminders, {
+    firstLine: (r) => `${r.isCompleted ? '✅' : '⏳'} ${r.title}`,
+    detailLines: (r) => [r.notes || 'No notes'],
+    separator: '\n\n',
+  });
 
   return {
     content: [

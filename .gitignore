@@ -8,6 +8,7 @@ npm-debug.log*
 # Swift
 swift-cli/.build/
 swift-cli/.swiftpm/
+swift-cli/RemindersCLI.app/
 *.xcodeproj
 *.xcworkspace
 *.dSYM.zip
@@ -34,3 +35,6 @@ coverage/
 # Development artifacts
 archive/
 docs/api/
+
+# Local planning scratch (wayfinder maps, specs)
+.scratch/

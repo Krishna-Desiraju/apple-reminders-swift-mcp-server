@@ -1,0 +1,54 @@
+{
+  "manifest_version": "0.3",
+  "name": "apple-reminders",
+  "display_name": "Apple Reminders",
+  "version": "0.2.0",
+  "description": "Read and manage Apple Reminders on macOS via EventKit.",
+  "long_description": "Local MCP server that exposes Apple Reminders to Claude through a Swift/EventKit CLI. Supports reading lists and reminders, due-date queries (today, overdue, completed), full-text search, and full CRUD on reminders including recurring rules and location triggers, plus creating, renaming, recoloring, and deleting lists.",
+  "author": {
+    "name": "Krishna Desiraju",
+    "url": "https://github.com/Krishna-Desiraju"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Krishna-Desiraju/apple-reminders-swift-mcp-server"
+  },
+  "homepage": "https://github.com/Krishna-Desiraju/apple-reminders-swift-mcp-server",
+  "documentation": "https://github.com/Krishna-Desiraju/apple-reminders-swift-mcp-server#readme",
+  "support": "https://github.com/Krishna-Desiraju/apple-reminders-swift-mcp-server/issues",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"]
+    }
+  },
+  "tools": [
+    { "name": "create_reminder", "description": "Create a new reminder with title, notes, due date, priority, recurrence, location triggers, and alarms." },
+    { "name": "update_reminder", "description": "Update fields on an existing reminder." },
+    { "name": "delete_reminder", "description": "Permanently delete a reminder." },
+    { "name": "complete_reminder", "description": "Mark a reminder as complete." },
+    { "name": "uncomplete_reminder", "description": "Mark a reminder as incomplete." },
+    { "name": "get_reminders", "description": "List reminders, optionally filtered by completion state and list." },
+    { "name": "get_all_lists", "description": "Get all Reminders lists." },
+    { "name": "create_list", "description": "Create a new Reminders list, optionally with a color and account." },
+    { "name": "update_list", "description": "Rename or recolor a Reminders list." },
+    { "name": "delete_list", "description": "Permanently delete a Reminders list and all reminders in it." },
+    { "name": "search_reminders", "description": "Full-text search across reminder titles and notes." },
+    { "name": "get_todays_reminders", "description": "Get reminders due today." },
+    { "name": "get_overdue_reminders", "description": "Get past-due reminders." },
+    { "name": "get_completed_reminders", "description": "Get completed reminders, optionally within a date range." },
+    { "name": "request_access", "description": "Trigger the macOS Reminders permission prompt. Run once before using other tools if access has not yet been granted." }
+  ],
+  "keywords": ["apple", "reminders", "macos", "eventkit", "todo", "tasks"],
+  "license": "MIT",
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["darwin"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "privacy_policies": []
+}

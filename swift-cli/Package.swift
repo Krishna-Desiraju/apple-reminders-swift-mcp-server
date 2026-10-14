@@ -34,7 +34,9 @@ let package = Package(
             name: "reminders-cli",
             dependencies: ["RemindersKit"]
         ),
-        // Test target
+        // Test target - Swift Testing, in-memory only (no Reminders access needed).
+        // Tests/RemindersKitTests must exist: a test target with no directory makes
+        // SPM fall back to Sources/ and overlap the main targets.
         .testTarget(
             name: "RemindersKitTests",
             dependencies: ["RemindersKit"]

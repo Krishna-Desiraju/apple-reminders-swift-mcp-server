@@ -22,6 +22,7 @@
     "test": "vitest",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
+    "test:live": "RUN_LIVE_REMINDERS=1 vitest run tests/live",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write \"src/**/*.ts\"",
@@ -47,8 +48,8 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.4",
-    "zod": "^3.22.4"
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -61,4 +62,3 @@
     "vitest": "^1.0.0"
   }
 }
-

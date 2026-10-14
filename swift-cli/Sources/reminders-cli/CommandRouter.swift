@@ -33,6 +33,12 @@ class CommandRouter {
             return try await handleDeleteReminder(jsonInput: jsonInput)
         case "get-all-lists":
             return try handleGetAllLists()
+        case "create-list":
+            return try handleCreateList(jsonInput: jsonInput)
+        case "update-list":
+            return try handleUpdateList(jsonInput: jsonInput)
+        case "delete-list":
+            return try await handleDeleteList(jsonInput: jsonInput)
         default:
             throw CLIError(
                 code: "UNKNOWN_COMMAND",
@@ -77,36 +83,9 @@ class CommandRouter {
     }
     
     private func handleUpdateReminder(jsonInput: String) throws -> String {
-        struct UpdateReminderInput: Codable {
-            let id: String
-            let title: String
-            let notes: String?
-            let listName: String?
-            let dueDate: String?
-            let priority: Int?
-            let flagged: Bool?
-            let url: String?
-            let tags: [String]?
-            let recurrence: RecurrenceRule?
-            let location: ReminderLocation?
-            let alarms: [ReminderAlarm]?
-        }
-        
+        // Own type (not CreateReminderInput): dueDate and recurrence tell "absent" from "null"
         let input = try decodeInput(UpdateReminderInput.self, from: jsonInput)
-        let updateInput = CreateReminderInput(
-            title: input.title,
-            notes: input.notes,
-            listName: input.listName,
-            dueDate: input.dueDate,
-            priority: input.priority,
-            flagged: input.flagged,
-            url: input.url,
-            tags: input.tags,
-            recurrence: input.recurrence,
-            location: input.location,
-            alarms: input.alarms
-        )
-        let reminder = try reminderManager.updateReminder(id: input.id, input: updateInput)
+        let reminder = try reminderManager.updateReminder(id: input.id, input: input)
         let response = CLIResponse(success: true, data: reminder)
         return try encodeResponse(response)
     }
@@ -117,8 +96,8 @@ class CommandRouter {
         }
         
         let input = try decodeInput(CompleteReminderInput.self, from: jsonInput)
-        let reminder = try reminderManager.completeReminder(id: input.id)
-        let response = CLIResponse(success: true, data: reminder)
+        let result = try reminderManager.completeReminder(id: input.id)
+        let response = CLIResponse(success: true, data: result)
         return try encodeResponse(response)
     }
     
@@ -128,8 +107,8 @@ class CommandRouter {
         }
         
         let input = try decodeInput(UncompleteReminderInput.self, from: jsonInput)
-        let reminder = try reminderManager.uncompleteReminder(id: input.id)
-        let response = CLIResponse(success: true, data: reminder)
+        let result = try reminderManager.uncompleteReminder(id: input.id)
+        let response = CLIResponse(success: true, data: result)
         return try encodeResponse(response)
     }
     
@@ -153,6 +132,32 @@ class CommandRouter {
     private func handleGetAllLists() throws -> String {
         let lists = listManager.getAllLists()
         let response = CLIResponse(success: true, data: lists)
+        return try encodeResponse(response)
+    }
+    
+    private func handleCreateList(jsonInput: String) throws -> String {
+        let input = try decodeInput(CreateListInput.self, from: jsonInput)
+        let list = try listManager.createList(input: input)
+        let response = CLIResponse(success: true, data: list)
+        return try encodeResponse(response)
+    }
+    
+    private func handleUpdateList(jsonInput: String) throws -> String {
+        let input = try decodeInput(UpdateListInput.self, from: jsonInput)
+        let list = try listManager.updateList(input: input)
+        let response = CLIResponse(success: true, data: list)
+        return try encodeResponse(response)
+    }
+    
+    private func handleDeleteList(jsonInput: String) async throws -> String {
+        struct DeleteListInput: Codable {
+            let id: String?
+            let name: String?
+        }
+        
+        let input = try decodeInput(DeleteListInput.self, from: jsonInput)
+        let result = try await listManager.deleteList(id: input.id, name: input.name)
+        let response = CLIResponse(success: true, data: result)
         return try encodeResponse(response)
     }
     

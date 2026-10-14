@@ -15,6 +15,12 @@ public class ReminderManager {
     /// - Parameter input: The reminder creation input
     /// - Returns: The created reminder
     public func createReminder(input: CreateReminderInput) throws -> Reminder {
+        // Validate before any EventKit call: bad rule values raise ObjC exceptions that crash the CLI
+        let ekRecurrenceRule = try input.recurrence.map { rule -> EKRecurrenceRule in
+            try rule.validate(dueDate: input.dueDate)
+            return try rule.toEKRecurrenceRule()
+        }
+        
         // Create EKReminder instance
         let ekReminder = EKReminder(eventStore: eventStore)
         
@@ -53,8 +59,9 @@ public class ReminderManager {
         }
         
         // Set recurrence rule
-        if let recurrence = input.recurrence {
-            ekReminder.addRecurrenceRule(recurrence.toEKRecurrenceRule())
+        // (replace, never append: a second rule shows in Reminders.app as a blank "Custom")
+        if let ekRecurrenceRule = ekRecurrenceRule {
+            ekReminder.recurrenceRules = [ekRecurrenceRule]
         }
         
         // Add alarms
@@ -222,11 +229,39 @@ public class ReminderManager {
     }
     
     /// Update an existing reminder
+    ///
+    /// `dueDate` and `recurrence` are tri-state: omitted leaves them alone (an omitted
+    /// `recurrence` never touches `recurrenceRules`, so unsupported rules and Hourly repeats
+    /// survive), `null` clears them, a value sets them. The other fields keep the full-replace
+    /// behaviour.
     /// - Parameter input: The reminder update input
     /// - Returns: The updated reminder
-    public func updateReminder(id: String, input: CreateReminderInput) throws -> Reminder {
+    public func updateReminder(id: String, input: UpdateReminderInput) throws -> Reminder {
         guard let ekReminder = eventStore.calendarItem(withIdentifier: id) as? EKReminder else {
             throw ReminderError.reminderNotFound(id)
+        }
+        
+        // Check everything that can fail before changing anything. Bad rule values raise ObjC
+        // exceptions that crash the CLI, so the rule is validated before any EventKit call.
+        if case .set(let rule) = input.recurrence {
+            try rule.validate()
+        }
+        
+        if let message = UpdateDueDateRules.violation(
+            currentlyHasRules: ekReminder.hasRecurrenceRules,
+            currentlyHasDueDate: ekReminder.dueDateComponents != nil,
+            recurrence: input.recurrence,
+            dueDate: input.dueDate,
+            title: input.title
+        ) {
+            throw ReminderError.invalidInput(message)
+        }
+        
+        let newDueDate: Date?
+        if case .set(let dueDateString) = input.dueDate {
+            newDueDate = try parseDateString(dueDateString)
+        } else {
+            newDueDate = nil
         }
         
         // Update title
@@ -249,16 +284,10 @@ public class ReminderManager {
             ekReminder.priority = max(0, min(9, priority))
         }
         
-        // Update due date
-        if let dueDateString = input.dueDate {
-            let date = try parseDateString(dueDateString)
-            ekReminder.dueDateComponents = Calendar.current.dateComponents(
-                [.year, .month, .day, .hour, .minute],
-                from: date
-            )
-        } else {
-            ekReminder.dueDateComponents = nil
-        }
+        // Update recurrence, then due date (the rule goes first so a rule and its due date can be
+        // cleared together)
+        try Self.applyRecurrence(input.recurrence, to: ekReminder)
+        Self.applyDueDate(input.dueDate, parsed: newDueDate, to: ekReminder)
         
         // Update URL
         if let urlString = input.url {
@@ -277,33 +306,65 @@ public class ReminderManager {
         }
         
         // Save the reminder
-        try eventStore.save(ekReminder, commit: true)
+        do {
+            try eventStore.save(ekReminder, commit: true)
+        } catch {
+            // Backstop for the due-date check above: EventKit's own "repeating reminder must
+            // have a due date" error gets the same agent-readable message
+            if let message = UpdateDueDateRules.message(
+                forSaveError: error, recurrence: input.recurrence, title: input.title)
+            {
+                throw ReminderError.invalidInput(message)
+            }
+            throw error
+        }
         
         return Reminder(from: ekReminder)
     }
     
-    /// Mark a reminder as complete
+    /// Mark a reminder as complete.
+    ///
+    /// Saving a recurring reminder with `isCompleted = true` makes EventKit advance it in place
+    /// (same ID, open, next due date, count-based end decremented, a completed copy left behind)
+    /// or, at the last occurrence, complete it. The saved object reflects that state, so the
+    /// outcome is read from it right after the save.
     /// - Parameter id: The reminder identifier
-    /// - Returns: The updated reminder
-    public func completeReminder(id: String) throws -> Reminder {
+    /// - Returns: The reminder after the save, how the completion played out, and the previous due date
+    public func completeReminder(id: String) throws -> CompleteReminderResult {
         guard let ekReminder = eventStore.calendarItem(withIdentifier: id) as? EKReminder else {
             throw ReminderError.reminderNotFound(id)
         }
+        
+        let before = CompletionSnapshot(
+            hasRecurrenceRules: ekReminder.hasRecurrenceRules, isCompleted: ekReminder.isCompleted)
+        let previousDueDate = ekReminder.dueDateComponents?.date
         
         ekReminder.isCompleted = true
         ekReminder.completionDate = Date()
         
         try eventStore.save(ekReminder, commit: true)
         
-        return Reminder(from: ekReminder)
+        let after = CompletionSnapshot(
+            hasRecurrenceRules: ekReminder.hasRecurrenceRules, isCompleted: ekReminder.isCompleted)
+        return CompleteReminderResult(
+            reminder: Reminder(from: ekReminder),
+            outcome: classifyCompletion(before: before, after: after),
+            previousDueDate: previousDueDate)
     }
     
-    /// Mark a reminder as incomplete
+    /// Mark a reminder as incomplete. A recurring reminder that is already open is left alone:
+    /// it advanced when it was completed, and that can't be undone.
     /// - Parameter id: The reminder identifier
-    /// - Returns: The updated reminder
-    public func uncompleteReminder(id: String) throws -> Reminder {
+    /// - Returns: The reminder and whether it was reopened or was already open
+    public func uncompleteReminder(id: String) throws -> UncompleteReminderResult {
         guard let ekReminder = eventStore.calendarItem(withIdentifier: id) as? EKReminder else {
             throw ReminderError.reminderNotFound(id)
+        }
+        
+        let outcome = decideUncomplete(
+            hasRecurrenceRules: ekReminder.hasRecurrenceRules, isCompleted: ekReminder.isCompleted)
+        guard outcome == .reopened else {
+            return UncompleteReminderResult(reminder: Reminder(from: ekReminder), outcome: outcome)
         }
         
         ekReminder.isCompleted = false
@@ -311,7 +372,43 @@ public class ReminderManager {
         
         try eventStore.save(ekReminder, commit: true)
         
-        return Reminder(from: ekReminder)
+        return UncompleteReminderResult(reminder: Reminder(from: ekReminder), outcome: outcome)
+    }
+    
+    // MARK: - Update helpers
+    
+    /// Apply the `recurrence` field of an update.
+    ///
+    /// Omitted leaves `recurrenceRules` alone (this is what keeps unsupported rules and Hourly
+    /// repeats intact), `null` removes the rules, an object replaces them with exactly one rule.
+    static func applyRecurrence(_ update: FieldUpdate<RecurrenceRule>, to ekReminder: EKReminder) throws {
+        switch update {
+        case .unchanged:
+            break
+        case .cleared:
+            ekReminder.recurrenceRules = nil
+        case .set(let rule):
+            try rule.validate()
+            // replace, never append: a second rule shows in Reminders.app as a blank "Custom"
+            ekReminder.recurrenceRules = [try rule.toEKRecurrenceRule()]
+        }
+    }
+    
+    /// Apply the `dueDate` field of an update. Omitted leaves the due date alone.
+    /// - Parameter parsed: The date parsed from a `.set` value
+    static func applyDueDate(_ update: FieldUpdate<String>, parsed: Date?, to ekReminder: EKReminder) {
+        switch update {
+        case .unchanged:
+            break
+        case .cleared:
+            ekReminder.dueDateComponents = nil
+        case .set:
+            guard let date = parsed else { return }
+            ekReminder.dueDateComponents = Calendar.current.dateComponents(
+                [.year, .month, .day, .hour, .minute],
+                from: date
+            )
+        }
     }
     
     // MARK: - Private Helpers
@@ -342,6 +439,10 @@ public enum ReminderError: Error, CustomStringConvertible {
     case reminderNotFound(String)
     case invalidDateFormat(String)
     case permissionDenied
+    case ambiguousList(String, Int)
+    case listNotModifiable(String)
+    case sourceNotFound(String)
+    case invalidInput(String)
     
     public var description: String {
         switch self {
@@ -355,6 +456,14 @@ public enum ReminderError: Error, CustomStringConvertible {
             return "Invalid date format: \(format). Expected ISO 8601."
         case .permissionDenied:
             return "Permission denied to access reminders"
+        case .ambiguousList(let name, let count):
+            return "\(count) lists are named \"\(name)\". Use the list ID instead."
+        case .listNotModifiable(let name):
+            return "List cannot be modified: \(name)"
+        case .sourceNotFound(let name):
+            return "Account not found: \(name)"
+        case .invalidInput(let message):
+            return message
         }
     }
 }

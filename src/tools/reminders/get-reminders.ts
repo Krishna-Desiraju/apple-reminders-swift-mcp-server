@@ -1,5 +1,6 @@
 import { SwiftExecutor } from '../../executor/swift-executor.js';
 import { listRemindersSchema, validateInput } from '../../validation/reminder-schemas.js';
+import { formatReminderList } from '../format-reminders.js';
 import type { Reminder } from '../../types/reminder.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
@@ -45,15 +46,17 @@ export async function getRemindersListHandler(
     };
   }
 
-  const remindersList = reminders
-    .map((r, index) => {
+  const remindersList = formatReminderList(reminders, {
+    firstLine: (r) => {
       const status = r.isCompleted ? '✅' : '⏳';
       const dueDateStr = r.dueDate
         ? ` | Due: ${new Date(r.dueDate).toLocaleDateString()}`
         : '';
-      return `${index + 1}. ${status} ${r.title}${dueDateStr}\n   List: ${r.listName} | ID: ${r.id}`;
-    })
-    .join('\n\n');
+      return `${status} ${r.title}${dueDateStr}`;
+    },
+    detailLines: (r) => [`List: ${r.listName} | ID: ${r.id}`],
+    separator: '\n\n',
+  });
 
   const responseText = `Found ${reminders.length} reminder(s):\n\n${remindersList}`;
 

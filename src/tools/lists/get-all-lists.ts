@@ -38,7 +38,8 @@ export async function getAllListsHandler(
 
   const listsList = lists
     .map((list, index) => {
-      return `${index + 1}. ${list.title}\n   Type: ${list.type} | ID: ${list.id}`;
+      const account = list.source ? ` | Account: ${list.source}` : '';
+      return `${index + 1}. ${list.title}\n   Type: ${list.type}${account} | ID: ${list.id}`;
     })
     .join('\n\n');
 
@@ -53,4 +54,3 @@ export async function getAllListsHandler(
     ],
   };
 }
-

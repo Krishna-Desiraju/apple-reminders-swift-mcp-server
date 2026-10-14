@@ -93,6 +93,14 @@ private func errorCodeForReminderError(_ error: ReminderError) -> String {
         return "INVALID_DATE_FORMAT"
     case .permissionDenied:
         return "PERMISSION_DENIED"
+    case .ambiguousList:
+        return "AMBIGUOUS_LIST"
+    case .listNotModifiable:
+        return "LIST_NOT_MODIFIABLE"
+    case .sourceNotFound:
+        return "SOURCE_NOT_FOUND"
+    case .invalidInput:
+        return "INVALID_INPUT"
     }
 }
 

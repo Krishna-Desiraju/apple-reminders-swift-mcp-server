@@ -1,5 +1,6 @@
 import { SwiftExecutor } from '../../executor/swift-executor.js';
 import { completedRemindersSchema, validateInput } from '../../validation/reminder-schemas.js';
+import { formatReminderList } from '../format-reminders.js';
 import type { Reminder } from '../../types/reminder.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
@@ -29,12 +30,13 @@ export async function getTodaysRemindersHandler(
     };
   }
 
-  const remindersList = reminders
-    .map((r, index) => {
+  const remindersList = formatReminderList(reminders, {
+    firstLine: (r) => {
       const time = r.dueDate ? new Date(r.dueDate).toLocaleTimeString() : 'All day';
-      return `${index + 1}. ${r.title} (${time})`;
-    })
-    .join('\n');
+      return `${r.title} (${time})`;
+    },
+    separator: '\n',
+  });
 
   return {
     content: [
@@ -72,12 +74,13 @@ export async function getOverdueRemindersHandler(
     };
   }
 
-  const remindersList = reminders
-    .map((r, index) => {
+  const remindersList = formatReminderList(reminders, {
+    firstLine: (r) => {
       const dueDate = r.dueDate ? new Date(r.dueDate).toLocaleDateString() : 'Unknown';
-      return `${index + 1}. ${r.title} (Due: ${dueDate})`;
-    })
-    .join('\n');
+      return `${r.title} (Due: ${dueDate})`;
+    },
+    separator: '\n',
+  });
 
   return {
     content: [
@@ -125,14 +128,15 @@ export async function getCompletedRemindersHandler(
     };
   }
 
-  const remindersList = reminders
-    .map((r, index) => {
+  const remindersList = formatReminderList(reminders, {
+    firstLine: (r) => {
       const completedDate = r.completionDate
         ? new Date(r.completionDate).toLocaleDateString()
         : 'Unknown';
-      return `${index + 1}. ${r.title} (Completed: ${completedDate})`;
-    })
-    .join('\n');
+      return `${r.title} (Completed: ${completedDate})`;
+    },
+    separator: '\n',
+  });
 
   return {
     content: [

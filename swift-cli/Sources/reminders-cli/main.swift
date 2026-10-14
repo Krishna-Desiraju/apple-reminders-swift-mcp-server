@@ -101,12 +101,16 @@ struct RemindersCLI {
           complete-reminder <json>    Mark a reminder as complete
           delete-reminder <json>      Delete a reminder
           get-all-lists               Get all reminder lists
+          create-list <json>          Create a reminder list
+          update-list <json>          Rename or recolor a reminder list
+          delete-list <json>          Delete a list and all its reminders
         
         Examples:
           reminders-cli request-access
           reminders-cli create-reminder '{"title":"Buy milk"}'
           reminders-cli get-reminder '{"id":"x-apple-reminder://ABC123"}'
           reminders-cli list-reminders '{"completed":false}'
+          reminders-cli create-list '{"name":"Groceries","color":"#34C759"}'
         """)
         exit(1)
     }
@@ -160,6 +164,14 @@ struct RemindersCLI {
             return "INVALID_DATE_FORMAT"
         case .permissionDenied:
             return "PERMISSION_DENIED"
+        case .ambiguousList:
+            return "AMBIGUOUS_LIST"
+        case .listNotModifiable:
+            return "LIST_NOT_MODIFIABLE"
+        case .sourceNotFound:
+            return "SOURCE_NOT_FOUND"
+        case .invalidInput:
+            return "INVALID_INPUT"
         }
     }
 }

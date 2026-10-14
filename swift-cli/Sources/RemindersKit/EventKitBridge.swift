@@ -44,9 +44,19 @@ public class EventKitBridge {
         return calendars.first { $0.title.lowercased() == name.lowercased() }
     }
     
-    /// Find a calendar by ID
+    /// Find all calendars matching a name (case-insensitive)
+    public func findLists(byName name: String) -> [EKCalendar] {
+        let calendars = eventStore.calendars(for: .reminder)
+        return calendars.filter { $0.title.lowercased() == name.lowercased() }
+    }
+    
+    /// Find a reminder calendar by ID
     public func findList(byId id: String) -> EKCalendar? {
-        return eventStore.calendar(withIdentifier: id)
+        guard let calendar = eventStore.calendar(withIdentifier: id),
+              calendar.allowedEntityTypes.contains(.reminder) else {
+            return nil
+        }
+        return calendar
     }
 }
 
